@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Foreground mark, matching the "S" mark on the splash screen.
+     Both the ring and glyph are centered on (54,54) — the true center of
+     the 108x108 viewport — so they sit inside the adaptive-icon safe zone
+     (a centered circle roughly 66dp across) regardless of which mask
+     shape a launcher applies. They were previously centered near y=32/37,
+     well above center, which pushed the mark visibly off-center and
+     risked it being clipped by circular/squircle masks. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Ring, centered at (54,54), radius 18 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:pathData="M54,54m-18,0a18,18 0,1 1,36 0a18,18 0,1 1,-36 0" />
+    <!-- "S" glyph, simplified as a filled zig-zag block since vector
+         drawables can't render arbitrary text. Bounding box y:[42,66],
+         x:[47,61] — centered on (54,54). -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M47,42 h14 v6 h-10 v4 h10 v14 h-14 v-6 h10 v-4 h-10 z" />
+</vector>

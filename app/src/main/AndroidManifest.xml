@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Required so Google Play Services can fetch Hanken Grotesk / Geist Mono
+         via the Downloadable Fonts API at runtime (see ui/theme/Type.kt).
+         No fonts are bundled in the APK. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Only meaningful on API < 29 (scoped storage made this obsolete from
+         Android 10 onward, and the Photo Picker needs no permission at
+         all). Requested by PermissionScreen only on those legacy
+         versions, to improve the odds CommandGenerator can resolve a real
+         on-disk path instead of falling back to the app cache. -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <!-- Required on API 30+ (and enforced by targetSdk 34) so the app is
+         allowed to detect whether Termux is installed. -->
+    <queries>
+        <package android:name="com.termux" />
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.StatusHDLite"
+        android:supportsRtl="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.StatusHDLite">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

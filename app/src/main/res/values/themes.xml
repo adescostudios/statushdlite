@@ -1,0 +1,10 @@
+<resources>
+    <!-- Plain platform theme used only as the pre-Compose window background/
+         status bar color. All real UI theming (colors, typography) is done
+         in Kotlin via StatusHDLiteTheme (Material 3). -->
+    <style name="Theme.StatusHDLite" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#F9F9FB</item>
+        <item name="android:navigationBarColor">#F9F9FB</item>
+        <item name="android:windowBackground">#F9F9FB</item>
+    </style>
+</resources>
