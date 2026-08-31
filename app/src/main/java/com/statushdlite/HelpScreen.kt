@@ -56,9 +56,9 @@ import com.statushdlite.components.openExternalUrl
 import com.statushdlite.ui.theme.Radius
 import com.statushdlite.ui.theme.Spacing
 
-private const val CONTACT_URL = "https://github.com/adescostudios/statushd-v1.25.0/issues"
-private const val DOCS_URL = "https://github.com/adescostudios/statushd-v1.25.0#readme"
-private const val COMMUNITY_URL = "https://github.com/adescostudios/statushd-v1.25.0/discussions"
+private const val CONTACT_URL = "https://github.com/adescostudios/statushd-v1.5.2/issues"
+private const val DOCS_URL = "https://github.com/adescostudios/statushd-v1.5.2#readme"
+private const val COMMUNITY_URL = "https://github.com/adescostudios/statushd-v1.5.2/discussions"
 
 private data class Guide(val title: String, val description: String, val detail: String, val icon: ImageVector)
 

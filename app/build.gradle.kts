@@ -11,8 +11,8 @@ android {
         applicationId = "com.statushdlite"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 10502
+        versionName = "1.5.2"
     }
 
     buildTypes {

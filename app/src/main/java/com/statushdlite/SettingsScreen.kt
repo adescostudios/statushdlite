@@ -34,7 +34,7 @@ import com.statushdlite.ui.theme.Radius
 import com.statushdlite.ui.theme.Spacing
 import kotlinx.coroutines.launch
 
-private const val REPO_URL = "https://github.com/adescostudios/statushd-v1.25.0"
+private const val REPO_URL = "https://github.com/adescostudios/statushd-v1.5.2"
 
 @Composable
 fun SettingsScreen(
