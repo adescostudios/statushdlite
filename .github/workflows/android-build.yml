@@ -1,0 +1,68 @@
+name: Android CI
+
+# Builds the debug APK on every push/PR to main, and on demand.
+#
+# Two known CI-specific gaps this workflow works around:
+#   1. This repo has no checked-in gradle-wrapper.jar (see README.md) —
+#      Gradle is installed directly and used to regenerate it before
+#      falling back to the normal ./gradlew.
+#   2. GitHub-hosted Ubuntu runners no longer reliably ship a writable
+#      Android SDK setup (sdkmanager may be missing/immutable on the
+#      default image), so the SDK and its licenses are set up explicitly
+#      here rather than assumed to already be in place.
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.6
+
+      - name: Regenerate Gradle wrapper jar
+        run: gradle wrapper --gradle-version 8.6
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Lint
+        run: ./gradlew lint --stacktrace
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: statushd-lite-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
