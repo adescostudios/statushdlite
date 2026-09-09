@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
@@ -32,9 +33,11 @@ import com.statushdlite.components.OutlinedDropdownField
 import com.statushdlite.components.openExternalUrl
 import com.statushdlite.ui.theme.Radius
 import com.statushdlite.ui.theme.Spacing
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-private const val REPO_URL = "https://github.com/adescostudios/statushd-v1.5.2"
+private const val REPO_URL = "https://github.com/adescostudios/statushdlite"
 
 @Composable
 fun SettingsScreen(
@@ -63,6 +66,11 @@ fun SettingsScreen(
 
     // App-wide "confirm before leaving" gate for outbound links.
     var pendingExternalUrl by remember { mutableStateOf<String?>(null) }
+
+    // "Check for Updates" state — idle until tapped, then holds whatever
+    // GitHub last told us (or the error if the check failed).
+    var isCheckingForUpdate by remember { mutableStateOf(false) }
+    var updateResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
 
     val versionName = remember {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
@@ -310,6 +318,69 @@ fun SettingsScreen(
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(Spacing.stackMd))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isCheckingForUpdate) {
+                                val currentResult = updateResult
+                                if (currentResult is UpdateCheckResult.UpdateAvailable) {
+                                    pendingExternalUrl = currentResult.releaseUrl
+                                } else {
+                                    isCheckingForUpdate = true
+                                    scope.launch {
+                                        updateResult = withContext(Dispatchers.IO) {
+                                            UpdateChecker.checkForUpdate(versionName)
+                                        }
+                                        isCheckingForUpdate = false
+                                    }
+                                }
+                            },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Check for Updates",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            val subtitle = when (val result = updateResult) {
+                                is UpdateCheckResult.UpdateAvailable ->
+                                    "v${result.latestVersion} available \u00b7 tap to view"
+                                is UpdateCheckResult.UpToDate -> "You're on the latest version"
+                                is UpdateCheckResult.Error -> result.message
+                                null -> if (isCheckingForUpdate) "Checking\u2026" else null
+                            }
+                            subtitle?.let {
+                                Text(
+                                    it,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        if (isCheckingForUpdate) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else if (updateResult is UpdateCheckResult.UpdateAvailable) {
+                            Icon(
+                                Icons.Filled.OpenInNew,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.Refresh,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             }

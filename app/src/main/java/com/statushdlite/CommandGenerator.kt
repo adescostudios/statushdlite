@@ -68,7 +68,13 @@ enum class OutputFormat(
 data class ConversionSettings(
     val useAdvanced: Boolean = false,
     val resolution: Resolution = DefaultResolution,
-    val bitrateMbps: Double = 8.5,
+    // Matches the fixed path's own bitrate ceiling (see VIDEO_MAX_BITRATE) —
+    // high enough for CRF-23-equivalent quality, low enough to keep a full
+    // 30s status video safely clear of WhatsApp's ~16MB recompression
+    // threshold even on busy footage. Going meaningfully higher than this
+    // trades away that safety margin for little visible gain, since the
+    // whole point is staying under the line, not getting close to it.
+    val bitrateMbps: Double = 3.0,
     val format: OutputFormat = OutputFormat.MP4
 )
 
@@ -101,6 +107,21 @@ object CommandGenerator {
     // forced length — ffmpeg simply stops re-encoding at that point, and has
     // no effect on a source clip that's already shorter.
     private const val VIDEO_MAX_DURATION_SECONDS = 30
+
+    // WhatsApp re-encodes Status videos again on its own servers once they
+    // cross an internal bitrate/size threshold — that second forced pass is
+    // where most of the visible quality loss actually happens, not this
+    // app's own encode. Plain -crf has no ceiling, so a busy/high-motion
+    // clip can spike to several Mbps and get flagged, even though a
+    // near-static looped photo never comes close (which is why photos were
+    // fine and videos weren't). -maxrate/-bufsize cap the *peak* bitrate
+    // CRF is allowed to spend without changing how it allocates bits
+    // frame-to-frame, so simple content still looks exactly as it did
+    // before — only busy footage gets reined in. At 3 Mbps a full 30s clip
+    // tops out around 11-12MB (audio included), comfortably under
+    // WhatsApp's ~16MB ceiling.
+    private const val VIDEO_MAX_BITRATE = "3M"
+    private const val VIDEO_BUFSIZE = "6M"
 
     /**
      * Resolves [uri] into a [ResolvedImage].
@@ -211,6 +232,8 @@ object CommandGenerator {
             append("-t $VIDEO_MAX_DURATION_SECONDS \\\n")
             append("-c:v libx264 \\\n")
             append("-crf 23 \\\n")
+            append("-maxrate $VIDEO_MAX_BITRATE \\\n")
+            append("-bufsize $VIDEO_BUFSIZE \\\n")
             append("-preset medium \\\n")
             append("-pix_fmt yuv420p \\\n")
             append("-c:a aac \\\n")
@@ -230,6 +253,12 @@ object CommandGenerator {
             "pad=$width:$height:(ow-iw)/2:(oh-ih)/2:color=black," +
             "unsharp=5:5:0.8:5:5:0.0"
         val bitrate = String.format(Locale.US, "%.1fM", settings.bitrateMbps)
+        // Same VBV-capping idea as the fixed path: -b:v alone is only an
+        // *average* target, so a busy stretch of footage can still spike
+        // well above it locally. maxrate/bufsize keep it from wandering
+        // too far past whatever average the person chose here.
+        val maxrate = String.format(Locale.US, "%.1fM", settings.bitrateMbps * 1.15)
+        val bufsize = String.format(Locale.US, "%.1fM", settings.bitrateMbps * 2)
         val outputPath = "$OUTPUT_DIR/$videoName.${settings.format.extension}"
         return buildString {
             append("ffmpeg -i \"$videoPath\" \\\n")
@@ -237,6 +266,8 @@ object CommandGenerator {
             append("-t $VIDEO_MAX_DURATION_SECONDS \\\n")
             append("-c:v ${settings.format.videoCodec} \\\n")
             append("-b:v $bitrate \\\n")
+            append("-maxrate $maxrate \\\n")
+            append("-bufsize $bufsize \\\n")
             append("-pix_fmt yuv420p \\\n")
             append("-c:a ${settings.format.audioCodec} \\\n")
             append("-b:a 128k \\\n")
