@@ -6,6 +6,15 @@
          No fonts are bundled in the APK. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Lets the in-app "Check for Updates" flow (Settings > About) launch
+         the system installer directly on a downloaded APK, instead of
+         sending the person to a browser to download it manually. The
+         person still has to tap "Install" on Android's own confirmation
+         dialog — that's an OS-level control this permission doesn't
+         bypass — but everything before that (checking, downloading,
+         opening the installer) happens without leaving the app. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Only meaningful on API < 29 (scoped storage made this obsolete from
          Android 10 onward, and the Photo Picker needs no permission at
          all). Requested by PermissionScreen only on those legacy
@@ -28,6 +37,20 @@
         android:label="@string/app_name"
         android:theme="@style/Theme.StatusHDLite"
         android:supportsRtl="true">
+
+        <!-- Exposes cacheDir/update.apk to the system installer as a
+             content:// URI (installers can't be handed a raw file:// path
+             on modern Android). Backs the Check for Updates download flow
+             in SettingsScreen.kt / UpdateInstaller.kt. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <activity
             android:name=".MainActivity"

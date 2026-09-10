@@ -1,6 +1,10 @@
 name: Android CI
 
-# Builds the debug APK on every push/PR to main, and on demand.
+# Builds the debug APK on every push/PR to main, on demand, and on version
+# tags (v*). A tag push also runs the release job below, which takes this
+# job's already-built APK and publishes it as a GitHub Release instead of
+# leaving it as an Actions artifact you have to dig through the run history
+# for.
 #
 # Two known CI-specific gaps this workflow works around:
 #   1. This repo has no checked-in gradle-wrapper.jar (see README.md) —
@@ -14,6 +18,7 @@ name: Android CI
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
@@ -66,3 +71,29 @@ jobs:
         with:
           name: lint-report
           path: app/build/reports/lint-results-debug.html
+
+  # Only runs on a version-tag push (v1.5.3, v1.6.0, ...), never on plain
+  # main pushes or PRs. Reuses the APK the build job above already produced
+  # rather than building it a second time.
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download built APK
+        uses: actions/download-artifact@v4
+        with:
+          name: statushd-lite-debug-apk
+          path: dist
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.apk
+          generate_release_notes: true

@@ -5,10 +5,17 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /** Result of asking GitHub whether a newer release exists than the one
- *  currently installed. */
+ *  currently installed. [UpdateAvailable.apkDownloadUrl] is null if the
+ *  release exists but has no .apk file attached (e.g. a source-only
+ *  release) — callers should fall back to [UpdateAvailable.releaseUrl] in
+ *  that case. */
 sealed class UpdateCheckResult {
     data object UpToDate : UpdateCheckResult()
-    data class UpdateAvailable(val latestVersion: String, val releaseUrl: String) : UpdateCheckResult()
+    data class UpdateAvailable(
+        val latestVersion: String,
+        val releaseUrl: String,
+        val apkDownloadUrl: String?
+    ) : UpdateCheckResult()
     data class Error(val message: String) : UpdateCheckResult()
 }
 
@@ -33,15 +40,31 @@ object UpdateChecker {
             val tagName = json.getString("tag_name") // e.g. "v1.5.3"
             val releaseUrl = json.getString("html_url")
             val latestVersion = tagName.removePrefix("v")
+            val apkDownloadUrl = findApkAssetUrl(json)
 
             if (isNewer(candidate = latestVersion, current = currentVersionName)) {
-                UpdateCheckResult.UpdateAvailable(latestVersion, releaseUrl)
+                UpdateCheckResult.UpdateAvailable(latestVersion, releaseUrl, apkDownloadUrl)
             } else {
                 UpdateCheckResult.UpToDate
             }
         } catch (e: Exception) {
             UpdateCheckResult.Error(e.message ?: "Couldn't check for updates")
         }
+    }
+
+    /** The release job attaches exactly one .apk to each release (see
+     *  android-build.yml), so the first asset ending in .apk is the one
+     *  we want. Returns null if the release has no APK attached at all. */
+    private fun findApkAssetUrl(releaseJson: JSONObject): String? {
+        val assets = releaseJson.optJSONArray("assets") ?: return null
+        for (i in 0 until assets.length()) {
+            val asset = assets.getJSONObject(i)
+            val name = asset.optString("name")
+            if (name.endsWith(".apk", ignoreCase = true)) {
+                return asset.getString("browser_download_url")
+            }
+        }
+        return null
     }
 
     private fun fetchJson(url: String): JSONObject {

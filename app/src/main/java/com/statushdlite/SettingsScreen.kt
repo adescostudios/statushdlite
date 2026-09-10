@@ -71,6 +71,9 @@ fun SettingsScreen(
     // GitHub last told us (or the error if the check failed).
     var isCheckingForUpdate by remember { mutableStateOf(false) }
     var updateResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
+    // null = not downloading; 0-100 while a download is in progress.
+    var downloadProgress by remember { mutableStateOf<Int?>(null) }
+    var downloadError by remember { mutableStateOf<String?>(null) }
 
     val versionName = remember {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
@@ -324,17 +327,49 @@ fun SettingsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable(enabled = !isCheckingForUpdate) {
+                            .clickable(enabled = !isCheckingForUpdate && downloadProgress == null) {
                                 val currentResult = updateResult
-                                if (currentResult is UpdateCheckResult.UpdateAvailable) {
-                                    pendingExternalUrl = currentResult.releaseUrl
-                                } else {
-                                    isCheckingForUpdate = true
-                                    scope.launch {
-                                        updateResult = withContext(Dispatchers.IO) {
-                                            UpdateChecker.checkForUpdate(versionName)
+                                when {
+                                    currentResult is UpdateCheckResult.UpdateAvailable &&
+                                        currentResult.apkDownloadUrl != null -> {
+                                        if (!UpdateInstaller.canInstallPackages(context)) {
+                                            context.startActivity(
+                                                UpdateInstaller.requestInstallPermissionIntent(context)
+                                            )
+                                        } else {
+                                            downloadError = null
+                                            downloadProgress = 0
+                                            scope.launch {
+                                                try {
+                                                    val file = withContext(Dispatchers.IO) {
+                                                        UpdateInstaller.downloadApk(
+                                                            context,
+                                                            currentResult.apkDownloadUrl
+                                                        ) { percent -> downloadProgress = percent }
+                                                    }
+                                                    UpdateInstaller.installApk(context, file)
+                                                } catch (e: Exception) {
+                                                    downloadError = e.message ?: "Download failed"
+                                                } finally {
+                                                    downloadProgress = null
+                                                }
+                                            }
                                         }
-                                        isCheckingForUpdate = false
+                                    }
+                                    // Release exists but has no APK attached — fall back to the
+                                    // browser rather than leave the tap doing nothing.
+                                    currentResult is UpdateCheckResult.UpdateAvailable -> {
+                                        pendingExternalUrl = currentResult.releaseUrl
+                                    }
+                                    else -> {
+                                        downloadError = null
+                                        isCheckingForUpdate = true
+                                        scope.launch {
+                                            updateResult = withContext(Dispatchers.IO) {
+                                                UpdateChecker.checkForUpdate(versionName)
+                                            }
+                                            isCheckingForUpdate = false
+                                        }
                                     }
                                 }
                             },
@@ -346,12 +381,22 @@ fun SettingsScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            val subtitle = when (val result = updateResult) {
-                                is UpdateCheckResult.UpdateAvailable ->
-                                    "v${result.latestVersion} available \u00b7 tap to view"
-                                is UpdateCheckResult.UpToDate -> "You're on the latest version"
-                                is UpdateCheckResult.Error -> result.message
-                                null -> if (isCheckingForUpdate) "Checking\u2026" else null
+                            val subtitle = when {
+                                downloadProgress != null -> "Downloading update\u2026 $downloadProgress%"
+                                downloadError != null -> downloadError
+                                else -> when (val result = updateResult) {
+                                    is UpdateCheckResult.UpdateAvailable -> when {
+                                        result.apkDownloadUrl == null ->
+                                            "v${result.latestVersion} available \u00b7 tap to view"
+                                        UpdateInstaller.canInstallPackages(context) ->
+                                            "v${result.latestVersion} available \u00b7 tap to install"
+                                        else ->
+                                            "v${result.latestVersion} available \u00b7 tap to allow installs"
+                                    }
+                                    is UpdateCheckResult.UpToDate -> "You're on the latest version"
+                                    is UpdateCheckResult.Error -> result.message
+                                    null -> if (isCheckingForUpdate) "Checking\u2026" else null
+                                }
                             }
                             subtitle?.let {
                                 Text(
@@ -361,7 +406,7 @@ fun SettingsScreen(
                                 )
                             }
                         }
-                        if (isCheckingForUpdate) {
+                        if (isCheckingForUpdate || downloadProgress != null) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp
